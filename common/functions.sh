@@ -30,3 +30,10 @@ function serpentFail()
     printError $*
     exit 1
 }
+
+function requireTools()
+{
+    for tool in $* ; do
+        which "${tool}" &>/dev/null  || serpentFail "Missing host executable: ${tool}"
+    done
+}
