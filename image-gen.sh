@@ -3,11 +3,12 @@
 executionPath=$(dirname $(realpath -s $0))
 
 # Build in RAM for testing
-LABEL="Serpent"
+LABEL="serpent"
 WORKDIR="${executionPath}/${LABEL}IMG"
 ROOTDIR="${WORKDIR}/ROOT"
-EFIDIR="${WORKDIR}/EFI"
+EFIROOTDIR="${WORKDIR}/EFI"
 IMAGE_SIZE="5GB"
+EFI_SIZE="75MB"
 ISO_BUILD=1
 IMG="${WORKDIR}/IMG/${LABEL}.img"
 EFIIMG="${WORKDIR}/IMG/EFI.img"
@@ -29,12 +30,12 @@ requireTools fallocate mkfs.ext4 tune2fs
 
 mkdir -p ${WORKDIR}/IMG
 mkdir -p ${ROOTDIR}
+mkdir -p ${EFIROOTDIR}
 
 # Prepare blank image
 fallocate -l ${IMAGE_SIZE} ${IMG} || serpentFail "Unable to create image"
 mkfs.ext4 -F ${IMG} || serpentFail "Unable to format image"
 tune2fs -c0 -i0 ${IMG}
-
 mount -o loop -t auto ${IMG} ${ROOTDIR} || serpentFail "Unable to mount image to ${ROOTDIR}"
 
 # Temporary rootfs (solbuild img)
@@ -49,7 +50,7 @@ chroot ${ROOTDIR} eopkg upgrade -y
 echo LANG=en_US.UTF-8 > ${ROOTDIR}/etc/locale.conf
 
 # Steps if making an ISO
-if [[ ${ISO_BUILD} ]]; then 
+if [[ ${ISO_BUILD} ]]; then
     # Install ISO tools and make initrd
     chroot ${ROOTDIR} eopkg install -y linux-current intel-microcode dracut prelink
 
@@ -66,8 +67,28 @@ if [[ ${ISO_BUILD} ]]; then
 
     # Setup user account
 
-    # Create EFI
 fi
 
-sync
+# mksquashfs to compress the image
+
+# Steps if making an ISO
+if [[ ${ISO_BUILD} ]]; then
+    # Create EFI
+    fallocate -l ${EFI_SIZE} ${EFIIMG} || serpentFail "Unable to create EFI"
+    mkfs.vfat -F 12 -n ESP ${EFIIMG} || serpentFail "Unable to format EFI"
+    mount -o loop -t auto ${EFIIMG} ${EFIROOTDIR} || serpentFail "Unable to mount EFI to ${EFIROOTDIR}"
+
+    install -Dm00755 ${ROOTDIR}/usr/lib/systemd/boot/efi/systemd-bootx64.efi ${EFIROOTDIR}/EFI/Boot/BOOTX64.EFI
+    install -Dm00644 ${ROOTDIR}/usr/lib/kernel/com.solus-project.current.$kernel_version ${EFIROOTDIR}/kernel
+    install -Dm00644 ${ROOTDIR}/initrd ${EFIROOTDIR}/initrd
+    echo "default ${LABEL}\ntimeout 5\n" > ${EFIROOTDIR}/loader/loader.conf
+    mkdir -p ${EFIROOTDIR}/entries
+    echo "title ${LABEL}\nlinux /kernel\ninitrd /initrd\noptions root=${LABEL}:CDLABEL=${LABEL} ro quiet splash" > ${EFIROOTDIR}/entries/${LABEL}.conf
+
+    sync
+    umount ${EFIROOTDIR}
+    # xorriso to have EFI booting iso
+
+fi
+
 

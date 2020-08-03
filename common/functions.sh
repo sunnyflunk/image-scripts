@@ -42,4 +42,5 @@ function clean_mounts() {
     # Umount stuff to exit cleanly
     [[ `grep ${ROOTDIR}/proc /etc/mtab` ]] && umount ${ROOTDIR}/proc
     [[ `grep ${ROOTDIR} /etc/mtab` ]] && umount ${ROOTDIR}
+    [[ `grep ${EFIROOTDIR} /etc/mtab` ]] && umount ${EFIROOTDIR}
 }
