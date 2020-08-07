@@ -4,7 +4,7 @@ executionPath=$(dirname $(realpath -s $0))
 
 # Build in RAM for testing
 LABEL="serpent"
-WORKDIR="${executionPath}/${LABEL}IMG"
+WORKDIR="/tmp/${LABEL}IMG"
 ROOTDIR="${WORKDIR}/ROOT"
 EFIROOTDIR="${WORKDIR}/EFI"
 IMAGE_SIZE="5GB"
