@@ -7,11 +7,14 @@ LABEL="serpent"
 WORKDIR="/tmp/${LABEL}IMG"
 ROOTDIR="${WORKDIR}/ROOT"
 EFIROOTDIR="${WORKDIR}/EFI"
-IMAGE_SIZE="5GB"
+IMAGE_SIZE="3GB"
 EFI_SIZE="75MB"
 ISO_BUILD=1
+COMPRESSION_LEVEL=3
 IMG="${WORKDIR}/IMG/${LABEL}.img"
-EFIIMG="${WORKDIR}/IMG/EFI.img"
+EFI=efi.img
+EFIIMG="${WORKDIR}/IMG/${EFI}"
+kernel_version=5.11.3-173
 
 
 if [ `id --user` != 0 ]; then
@@ -24,7 +27,7 @@ fi
 # Cleanup from previous run
 clean_mounts
 
-requireTools fallocate mkfs.ext4 tune2fs
+requireTools fallocate mkfs.ext4 tune2fs mksquashfs chroot xorriso
 
 [[ -d ${WORKDIR} ]] && rm -rf ${WORKDIR}
 
@@ -54,13 +57,12 @@ if [[ ${ISO_BUILD} ]]; then
     # Install ISO tools and make initrd
     chroot ${ROOTDIR} eopkg install -y linux-current intel-microcode dracut prelink
 
-    kernel_version=5.6.19-158.current
     MODULES="bash dmsquash-live pollcdrom rescue systemd"
-    DRIVERS="ext2 msdosehci_hcd ohci_hcd sd_mod squashfs sr_mod uhci_hcd usb_storage usbhid vfat xhci_hcd xhci_pci"
-
+    DRIVERS="ext2 ohci_hcd sd_mod squashfs sr_mod uhci_hcd usb_storage usbhid vfat xhci_hcd xhci_pci"
+#msdosehci_hcd
     chroot ${ROOTDIR} dracut --prelink --strip --hardlink --force \
         --no-hostonly-cmdline -N --nomdadmconf --early-microcode \
-        --kver $kernel_version \
+        --kver $kernel_version.current \
         --add "${MODULES}" \
         --add-drivers "${DRIVERS}" \
         /initrd
@@ -69,7 +71,9 @@ if [[ ${ISO_BUILD} ]]; then
 
 fi
 
-# mksquashfs to compress the image
+chroot ${ROOTDIR} eopkg dc
+umount -f ${ROOTDIR}/proc
+
 
 # Steps if making an ISO
 if [[ ${ISO_BUILD} ]]; then
@@ -80,15 +84,28 @@ if [[ ${ISO_BUILD} ]]; then
 
     install -Dm00755 ${ROOTDIR}/usr/lib/systemd/boot/efi/systemd-bootx64.efi ${EFIROOTDIR}/EFI/Boot/BOOTX64.EFI
     install -Dm00644 ${ROOTDIR}/usr/lib/kernel/com.solus-project.current.$kernel_version ${EFIROOTDIR}/kernel
-    install -Dm00644 ${ROOTDIR}/initrd ${EFIROOTDIR}/initrd
-    echo "default ${LABEL}\ntimeout 5\n" > ${EFIROOTDIR}/loader/loader.conf
-    mkdir -p ${EFIROOTDIR}/entries
-    echo "title ${LABEL}\nlinux /kernel\ninitrd /initrd\noptions root=${LABEL}:CDLABEL=${LABEL} ro quiet splash" > ${EFIROOTDIR}/entries/${LABEL}.conf
+    mv ${ROOTDIR}/initrd ${EFIROOTDIR}/initrd
+    mkdir -p ${EFIROOTDIR}/loader/entries
+
+    echo "default ${LABEL}
+timeout 5" > ${EFIROOTDIR}/loader/loader.conf
+
+    echo "title ${LABEL}
+linux /kernel
+initrd /initrd
+options root=${LABEL}:CDLABEL=${LABEL} ro quiet splash" > ${EFIROOTDIR}/loader/entries/${LABEL}.conf
 
     sync
     umount ${EFIROOTDIR}
-    # xorriso to have EFI booting iso
-
 fi
 
+# mksquashfs to compress the image
+umount ${ROOTDIR}
+#mksquashfs ${ROOTDIR}/* ${IMG} -comp zstd -Xcompression-level ${COMPRESSION_LEVEL} -progress
 
+# xorriso to have EFI booting iso
+if [[ ${ISO_BUILD} ]]; then
+    xorriso -as mkisofs -o ${WORKDIR}/${LABEL}.iso -iso-level 3 -V ${LABEL} -A "TEST ISO" ${IMG} ${EFIIMG} -e /${EFI} -no-emul-boot
+fi
+
+echo "qemu-system-x86_64 -enable-kvm -m 2048 -cpu host -smp cpus=2 -bios /usr/share/ovmf/OVMF.fd -cdrom ${WORKDIR}/${LABEL}.iso -soundhw hda"
