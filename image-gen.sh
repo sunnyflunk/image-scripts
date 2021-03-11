@@ -101,7 +101,7 @@ fi
 
 # mksquashfs to compress the image
 #umount ${ROOTDIR}
-mksquashfs ${ROOTDIR}/* ${IMG} -comp zstd -Xcompression-level ${COMPRESSION_LEVEL} -progress
+mksquashfs ${ROOTDIR}/* ${IMG} -b 1M -comp zstd -Xcompression-level ${COMPRESSION_LEVEL} -progress
 
 # xorriso to have EFI booting iso
 if [[ ${ISO_BUILD} ]]; then
