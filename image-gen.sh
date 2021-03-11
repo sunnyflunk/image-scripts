@@ -36,10 +36,10 @@ mkdir -p ${ROOTDIR}
 mkdir -p ${EFIROOTDIR}
 
 # Prepare blank image
-fallocate -l ${IMAGE_SIZE} ${IMG} || serpentFail "Unable to create image"
-mkfs.ext4 -F ${IMG} || serpentFail "Unable to format image"
-tune2fs -c0 -i0 ${IMG}
-mount -o loop -t auto ${IMG} ${ROOTDIR} || serpentFail "Unable to mount image to ${ROOTDIR}"
+#fallocate -l ${IMAGE_SIZE} ${IMG} || serpentFail "Unable to create image"
+#mkfs.ext4 -F ${IMG} || serpentFail "Unable to format image"
+#tune2fs -c0 -i0 ${IMG}
+#mount -o loop -t auto ${IMG} ${ROOTDIR} || serpentFail "Unable to mount image to ${ROOTDIR}"
 
 # Temporary rootfs (solbuild img)
 cp -a /tmp/lll/* ${ROOTDIR}
@@ -100,8 +100,8 @@ options root=${LABEL}:CDLABEL=${LABEL} ro quiet splash" > ${EFIROOTDIR}/loader/e
 fi
 
 # mksquashfs to compress the image
-umount ${ROOTDIR}
-#mksquashfs ${ROOTDIR}/* ${IMG} -comp zstd -Xcompression-level ${COMPRESSION_LEVEL} -progress
+#umount ${ROOTDIR}
+mksquashfs ${ROOTDIR}/* ${IMG} -comp zstd -Xcompression-level ${COMPRESSION_LEVEL} -progress
 
 # xorriso to have EFI booting iso
 if [[ ${ISO_BUILD} ]]; then
